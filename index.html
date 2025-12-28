@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>종이약국 | 당신을 위한 책 처방</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+    <style>
+      @font-face {
+          font-family: 'Cafe24Ssurround';
+          src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2105_2@1.0/Cafe24Ssurround.woff') format('woff');
+          font-weight: normal;
+          font-style: normal;
+      }
+      
+      /* Base font size adjustment */
+      html {
+        font-size: 100%; 
+      }
+      
+      body {
+        font-family: 'Pretendard', sans-serif;
+      }
+      
+      .font-title {
+        font-family: 'Gaegu', cursive;
+      }
+      
+      .font-surround {
+        font-family: 'Cafe24Ssurround', 'Pretendard', sans-serif;
+      }
+
+      .text-shadow-sm { text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1); }
+      
+      /* Custom scrollbar */
+      .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+      
+      /* Light Mode Scrollbar */
+      .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,0.05); border-radius: 10px; }
+      .custom-scrollbar::-webkit-scrollbar-thumb { background: #D4A574; border-radius: 10px; }
+      
+      /* Dark Mode Scrollbar */
+      .dark .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+      .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #9B8FB8; }
+
+      /* Brick Background - Dynamic based on mode using CSS variables */
+      :root {
+        --brick-color: #D4A574;
+        --brick-bg: #F4E8D0;
+      }
+      .dark {
+        --brick-color: #4A4060;
+        --brick-bg: #2C2438;
+      }
+
+      #brick-bg {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        background-color: var(--brick-bg);
+        background-image: 
+          linear-gradient(335deg, var(--brick-color) 23px, transparent 23px),
+          linear-gradient(155deg, var(--brick-color) 23px, transparent 23px),
+          linear-gradient(335deg, var(--brick-color) 23px, transparent 23px),
+          linear-gradient(155deg, var(--brick-color) 23px, transparent 23px);
+        background-size: 58px 58px;
+        background-position: 0px 2px, 4px 35px, 29px 31px, 34px 6px;
+        opacity: 0.05; /* Very subtle texture */
+        transition: background-color 0.5s ease, opacity 0.5s ease;
+      }
+      
+      /* Cherry Blossom Animation */
+      @keyframes fall {
+        0% { top: -10%; opacity: 0.8; transform: translateX(0) rotate(0); }
+        100% { top: 110%; opacity: 0; transform: translateX(calc(var(--sway) * 1px)) rotate(calc(var(--rot) * 1deg)); }
+      }
+
+      .petal {
+        position: fixed;
+        background-color: #ffc0cb; 
+        border-radius: 150px 0;
+        box-shadow: 0 0 5px rgba(255, 192, 203, 0.5);
+        z-index: 0;
+        pointer-events: none;
+        animation: fall linear infinite;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.553.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.1"
+  }
+}
+</script>
+<script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            // Day Palette (Old Bookshelf)
+            'day-bg': '#F4E8D0',     // Cream Page
+            'day-card': '#E8DCC4',   // Dark Beige
+            'day-text': '#5D4E37',   // Dark Brown
+            'day-sub': '#8B7355',    // Light Brown
+            'day-accent': '#D4A574', // Golden Ochre
+            'day-btn': '#C9B896',    // Sand
+            'day-btn-shadow': 'rgba(93, 78, 55, 0.15)',
+
+            // Night Palette (Cozy Night)
+            'night-bg': '#2C2438',   // Deep Violet
+            'night-card': '#3D3350', // Light Violet
+            'night-text': '#E8DED5', // Warm Ivory
+            'night-sub': '#C5B8A8',  // Calm Beige
+            'night-accent': '#9B8FB8', // Lavender Gray
+            'night-btn': '#4A4060',  // Warm Purple
+            'night-cta': '#E8B67B',  // Warm Gold
+            'night-btn-shadow': 'rgba(155, 143, 184, 0.2)',
+          },
+          fontFamily: {
+            'title': ['Gaegu', 'cursive'],
+            'surround': ['Cafe24Ssurround', 'Pretendard', 'sans-serif'],
+            'body': ['Pretendard', 'sans-serif'],
+          },
+          boxShadow: {
+            'day': '0 4px 6px -1px rgba(93, 78, 55, 0.15)',
+            'night': '0 4px 6px -1px rgba(155, 143, 184, 0.2)',
+          }
+        }
+      }
+    }
+  </script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>

@@ -51,10 +51,11 @@ interface GeneratedBookCoverProps {
   className?: string;
 }
 
-const GeneratedBookCover: React.FC<GeneratedBookCoverProps> = ({ title, author, isbn, coverImageUrl, size = 'large', className }) => {
-  const [displayUrl, setDisplayUrl] = useState<string | null>(null);
-  const [showFallback, setShowFallback] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+const coverSources = [
+  coverImageUrl, // 알라딘에서 가져온 커버 (최우선)
+  isbn ? `https://image.aladin.co.kr/product/${isbn.substring(0, 4)}/${isbn}.jpg` : undefined,
+  isbn ? `https://contents.kyobobook.co.kr/sih/fit-in/400x0/pdt/${isbn}.jpg` : undefined,
+].filter((url): url is string => !!url);
 
   // Re-calculate coverSources based on props without memoization, as props drive the effect.
   const coverSources = [

@@ -1,6 +1,22 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import type { BookRecommendation, UserInput } from '../types';
 
+// ⭐ 알라딘 검색 함수 추가
+const searchAladinBook = async (title: string, author: string): Promise<any> => {
+  try {
+    const query = `${title} ${author}`;
+    const response = await fetch(`/api/aladin?query=${encodeURIComponent(query)}&queryType=Title`);
+    
+    if (!response.ok) return null;
+    
+    const data = await response.json();
+    return data.books?.[0] || null;
+  } catch (error) {
+    console.error('알라딘 검색 오류:', error);
+    return null;
+  }
+};
+
 const getBookRecommendations = async (
   userInput: UserInput, 
   region: string, 
@@ -14,61 +30,56 @@ const getBookRecommendations = async (
     items: {
       type: Type.OBJECT,
       properties: {
-        title: { type: Type.STRING, description: "The book title in Korean." },
-        author: { type: Type.STRING, description: "The author's name in Korean." },
-        publisher: { type: Type.STRING, description: "The publisher's name in Korean." },
-        isbn: { type: Type.STRING, description: "The book's 13-digit ISBN, without hyphens." },
-        coverImageUrl: { type: Type.STRING, description: "A direct, high-quality book cover image URL, preferably from the National Library of Korea's Seoji Hart system (서지정보유통지원시스템) or a major Korean online bookstore as a fallback." },
-        description: { type: Type.STRING, description: "A short, insightful one-sentence description of the book." },
-        aiReason: { type: Type.STRING, description: "An empathetic reason for recommending this book, written in a calm and thoughtful tone." },
+        title: { type: Type.STRING },
+        author: { type: Type.STRING },
+        publisher: { type: Type.STRING },
+        isbn: { type: Type.STRING },
+        description: { type: Type.STRING },
+        aiReason: { type: Type.STRING },
         vibe: {
           type: Type.ARRAY,
-          description: "An array of 3 relevant keywords or themes in Korean.",
           items: { type: Type.STRING }
         },
         libraries: {
           type: Type.ARRAY,
-          description: "An array of 3 plausible public libraries located near the user's specified location.",
           items: {
             type: Type.OBJECT,
             properties: {
-              name: { type: Type.STRING, description: "The library's full name." },
-              available: { type: Type.BOOLEAN, description: "A boolean indicating if the book is available." },
-              distance: { type: Type.STRING, description: "Optional. A plausible distance like '2.3km' if available is true." },
-              waitlist: { type: Type.INTEGER, description: "Optional. A plausible number on the waitlist if available is false." },
-              url: { type: Type.STRING, description: "Optional. The direct URL to the library's homepage or the book search result page for this specific book." }
+              name: { type: Type.STRING },
+              available: { type: Type.BOOLEAN },
+              distance: { type: Type.STRING },
+              waitlist: { type: Type.INTEGER },
             },
             required: ['name', 'available']
           }
         },
       },
-      required: ['title', 'author', 'publisher', 'isbn', 'coverImageUrl', 'description', 'aiReason', 'vibe', 'libraries']
+      required: ['title', 'author', 'publisher', 'description', 'aiReason', 'vibe', 'libraries']
     }
   };
 
   const genrePreference = userInput.genre
-    ? `They have expressed a preference for the ${userInput.genre} genre.`
-    : "They have not specified a preferred genre, so recommend from any genre that fits their needs.";
+    ? `선호 장르: ${userInput.genre}`
+    : "장르 제한 없음";
 
   const locationInfo = location
-    ? `Their current location is approximately latitude: ${location.latitude}, longitude: ${location.longitude}. Base the library recommendations on this precise location.`
-    : `They are interested in libraries in the ${region} area of South Korea.`;
+    ? `위치: 위도 ${location.latitude}, 경도 ${location.longitude}`
+    : `지역: ${region}`;
 
-  let prompt = `You are a sophisticated and thoughtful book curator for "종이약국" (The Paper Pharmacy). Your tone is calm, empathetic, and knowledgeable, like a trusted librarian. Your goal is to prescribe the perfect book for a user's state of mind.
+  let prompt = `감정 기반 책 큐레이터로서 다음 정보를 바탕으로 정확히 3권의 책을 추천하세요.
 
-The user's current mood is: ${userInput.mood}
-Their situation is: ${userInput.situation || "Not specified."}
+기분: ${userInput.mood}
+상황: ${userInput.situation || "미지정"}
 ${genrePreference}
-Their goal for reading is: ${userInput.purpose || "Not specified."}
+목적: ${userInput.purpose || "미지정"}
 ${locationInfo}
 
-Based on this, recommend exactly 3 books. For each book, provide the requested information including its 13-digit ISBN and a high-quality cover image URL. Ensure the library information is plausible for major public libraries near the user's specified location, and include a direct URL to each library's website if possible.`;
+중요: 반드시 실제로 존재하는 한국어 도서만 추천하세요.
+도서관 정보는 ${region} 지역의 실제 공공도서관 3곳을 포함하되, URL은 생성하지 마세요.`;
 
   if (excludeTitles.length > 0) {
-    prompt += `\n\nImportant: Please provide a completely new set of recommendations. Do NOT include any of the following titles: ${excludeTitles.join(', ')}.`;
+    prompt += `\n\n제외할 책: ${excludeTitles.join(', ')}`;
   }
-
-  prompt += `\n\nYour entire output must be a single JSON array, adhering strictly to the provided schema. Do not include any markdown formatting like \`\`\`json.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -81,27 +92,41 @@ Based on this, recommend exactly 3 books. For each book, provide the requested i
     });
     
     const jsonString = response.text.trim();
-    const booksFromAI: Omit<BookRecommendation, 'purchaseLinks'>[] = JSON.parse(jsonString);
+    const booksFromAI: Omit<BookRecommendation, 'purchaseLinks' | 'coverImageUrl' | 'isbn'>[] = JSON.parse(jsonString);
 
-    // Add purchase links to the AI results. Cover fetching is now handled on the client.
-    const resultsWithLinks = booksFromAI.map((book) => {
+    // ⭐ 알라딘 API로 실제 도서 정보 확인
+    const enrichedBooks = await Promise.all(
+      booksFromAI.map(async (book) => {
+        // 알라딘에서 실제 책 검색
+        const aladinBook = await searchAladinBook(book.title, book.author);
+        
         const encodedTitle = encodeURIComponent(book.title);
+        
+        // ⭐ 도서관 URL 생성 (국립중앙도서관 통합검색)
+        const librariesWithUrl = book.libraries.map(lib => ({
+          ...lib,
+          url: `https://www.nl.go.kr/seoji/SearchListSimple.do?searchType=SIMPLE&searchKeyword=${encodedTitle}`
+        }));
         
         return {
           ...book,
+          isbn: aladinBook?.isbn || '9788000000000', // fallback ISBN
+          coverImageUrl: aladinBook?.cover || '',
           purchaseLinks: {
             yes24: `https://www.yes24.com/Product/Search?query=${encodedTitle}`,
             kyobo: `https://search.kyobobook.co.kr/search?keyword=${encodedTitle}`,
-            aladin: `https://www.aladin.co.kr/search/wsearchresult.aspx?SearchWord=${encodedTitle}`
-          }
+            aladin: aladinBook?.link || `https://www.aladin.co.kr/search/wsearchresult.aspx?SearchWord=${encodedTitle}`
+          },
+          libraries: librariesWithUrl
         };
-      });
+      })
+    );
 
-    return resultsWithLinks;
+    return enrichedBooks;
 
   } catch (error) {
-    console.error("Error fetching book recommendations:", error);
-    throw new Error("AI 추천을 받아오는 데 실패했어요. 잠시 후 다시 시도해주세요.");
+    console.error("추천 오류:", error);
+    throw new Error("AI 추천 실패. 다시 시도해주세요.");
   }
 };
 

@@ -1,45 +1,28 @@
-
 import React, { useState, useEffect } from 'react';
 
-// Simple string hash to generate a number for deterministic generation.
 const stringToHash = (str: string): number => {
   let hash = 0;
   if (str.length === 0) return hash;
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
     hash = (hash << 5) - hash + char;
-    hash = hash & hash; // Convert to 32bit integer
+    hash = hash & hash;
   }
   return Math.abs(hash);
 };
 
-// A curated list of beautiful, harmonious color palettes.
 const colorPalettes = [
-  { from: '#ff9a9e', to: '#fecfef', text: '#5e3449' }, // Cotton Candy
-  { from: '#a1c4fd', to: '#c2e9fb', text: '#2c3e50' }, // Gentle Sky
-  { from: '#84fab0', to: '#8fd3f4', text: '#13547a' }, // Ocean Mist
-  { from: '#f6d365', to: '#fda085', text: '#8c520a' }, // Warm Sunset
-  { from: '#d4fc79', to: '#96e6a1', text: '#2c522c' }, // Fresh Lime
-  { from: '#c3a3f4', to: '#fbc2eb', text: '#4a2c52' }, // Lavender Dream
-  { from: '#fccb90', to: '#d57eeb', text: '#522c4a' }, // Soft Peach
-  { from: '#48c6ef', to: '#6f86d6', text: '#073352' }, // Deep Ocean
-  { from: '#ff758c', to: '#ff7eb3', text: '#6d1839' }, // Raspberry Fizz
-  { from: '#56ab2f', to: '#a8e063', text: '#193a0d' }, // Lush Meadow
-  { from: '#30cfd0', to: '#330867', text: '#ffffff' }, // Galaxy Night
-  { from: '#20002c', to: '#cbb4d4', text: '#ffffff' }, // Royal Amethyst
-  { from: '#1e3c72', to: '#2a5298', text: '#ffffff' }, // Starry Night
-  { from: '#ffdde1', to: '#ee9ca7', text: '#7d3c47' }, // Rose Petals
-  { from: '#00c3ff', to: '#ffff1c', text: '#004c66' }, // Electric Pop
+  { from: '#ff9a9e', to: '#fecfef', text: '#5e3449' },
+  { from: '#a1c4fd', to: '#c2e9fb', text: '#2c3e50' },
+  { from: '#84fab0', to: '#8fd3f4', text: '#13547a' },
+  { from: '#f6d365', to: '#fda085', text: '#8c520a' },
+  { from: '#d4fc79', to: '#96e6a1', text: '#2c522c' },
+  { from: '#c3a3f4', to: '#fbc2eb', text: '#4a2c52' },
 ];
 
-// Abstract SVG patterns for background texture
 const patterns = [
-  // Plus signs
   `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Cpath fill='%23FFFFFF' fill-opacity='0.3' d='M2 9h6V3h2v6h6v2H10v6H8V11H2V9z'/%3E%3C/svg%3E")`,
-  // Dots
   `url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23FFFFFF' fill-opacity='0.3' fill-rule='evenodd'%3E%3Ccircle cx='3' cy='3' r='3'/%3E%3Ccircle cx='13' cy='13' r='3'/%3E%3C/g%3E%3C/svg%3E")`,
-  // Zigzag
-  `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20'%3E%3Cpath fill='%23FFFFFF' fill-opacity='0.3' d='M0 0h20L0 20zM20 20H0L20 0z'/%3E%3C/svg%3E")`,
 ];
 
 interface GeneratedBookCoverProps {
@@ -51,76 +34,81 @@ interface GeneratedBookCoverProps {
   className?: string;
 }
 
-const coverSources = [
-  coverImageUrl, // 알라딘에서 가져온 커버 (최우선)
-  isbn ? `https://image.aladin.co.kr/product/${isbn.substring(0, 4)}/${isbn}.jpg` : undefined,
-  isbn ? `https://contents.kyobobook.co.kr/sih/fit-in/400x0/pdt/${isbn}.jpg` : undefined,
-].filter((url): url is string => !!url);
-
-  // Re-calculate coverSources based on props without memoization, as props drive the effect.
-  const coverSources = [
-    coverImageUrl,
-    isbn ? `https://contents.kyobobook.co.kr/sih/fit-in/400x0/pdt/${isbn}.jpg` : undefined,
-    isbn ? `https://cover.aladin.co.kr/getbook.aspx?isbn=${isbn}` : undefined,
-    // Yes24 does not have a reliable ISBN-based URL pattern.
-    isbn ? `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg?default=false` : undefined,
-  ].filter((url): url is string => !!url);
-
+const GeneratedBookCover: React.FC<GeneratedBookCoverProps> = ({ 
+  title, 
+  author, 
+  isbn, 
+  coverImageUrl, 
+  size = 'large', 
+  className 
+}) => {
+  const [displayUrl, setDisplayUrl] = useState<string | null>(null);
+  const [showFallback, setShowFallback] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Reset state for new props
     setDisplayUrl(null);
     setShowFallback(false);
     setIsLoading(true);
 
-    if (coverSources.length === 0) {
+    // ⭐ 알라딘 API에서 받은 coverImageUrl을 최우선으로 사용
+    const imageUrls = [
+      coverImageUrl, // 알라딘 TTB API가 제공한 정확한 URL
+    ].filter(Boolean) as string[];
+
+    console.log('📸 커버 URL 시도:', imageUrls);
+
+    if (imageUrls.length === 0) {
+      console.log('⚠️ 커버 URL 없음, fallback 표시');
       setShowFallback(true);
       setIsLoading(false);
       return;
     }
 
-    let isMounted = true;
-    let imageLoaded = false;
-    let failedAttempts = 0;
+    let loaded = false;
 
-    coverSources.forEach(src => {
-      // Create an in-memory image to preload
+    // 이미지 로드 시도
+    const tryLoadImage = (index: number) => {
+      if (index >= imageUrls.length) {
+        console.log('❌ 모든 URL 실패, fallback 표시');
+        setShowFallback(true);
+        setIsLoading(false);
+        return;
+      }
+
       const img = new Image();
+      img.crossOrigin = 'anonymous';
       
       img.onload = () => {
-        if (isMounted && !imageLoaded) {
-          imageLoaded = true;
-          setDisplayUrl(src);
+        if (!loaded) {
+          loaded = true;
+          setDisplayUrl(imageUrls[index]);
           setIsLoading(false);
+          console.log('✅ 이미지 로드 성공:', imageUrls[index]);
         }
       };
 
       img.onerror = () => {
-        if (isMounted) {
-          failedAttempts++;
-          if (failedAttempts === coverSources.length && !imageLoaded) {
-            setShowFallback(true);
-            setIsLoading(false);
-          }
-        }
+        console.log('❌ 이미지 로드 실패:', imageUrls[index]);
+        // 다음 URL 시도
+        tryLoadImage(index + 1);
       };
-      
-      img.src = src;
-    });
 
-    return () => {
-      isMounted = false;
+      img.src = imageUrls[index];
     };
-  }, [isbn, title, coverImageUrl]); // Rerun effect when these props change
+
+    tryLoadImage(0);
+
+  }, [isbn, title, coverImageUrl]);
 
   const containerClasses = size === 'large' 
     ? "w-32 h-48 md:w-40 md:h-60 lg:w-48 lg:h-72 rounded-r-xl rounded-l-md shadow-xl border-l-4 border-white/20" 
     : "w-14 h-20 rounded-r-md rounded-l-sm shadow-md border-l-2 border-white/20 flex-shrink-0";
 
+  // Fallback 디자인
   if (showFallback) {
-    // Enhanced fallback generation logic
     const safeTitle = title || "제목 미정";
-    const safeAuthor = author || "작자 미상";
+    const safeAuthor = author || "저자 미상";
     
     const hash = stringToHash(safeTitle + safeAuthor);
     const palette = colorPalettes[hash % colorPalettes.length];
@@ -132,55 +120,52 @@ const coverSources = [
 
     return (
       <div 
-          className={`relative ${containerClasses} ${className} ${paddingClass} flex flex-col justify-center items-center text-center overflow-hidden transition-transform hover:scale-105 group`}
-          style={{
-              background: `linear-gradient(135deg, ${palette.from} 0%, ${palette.to} 100%)`,
-              color: palette.text,
-          }}
+        className={`relative ${containerClasses} ${className} ${paddingClass} flex flex-col justify-center items-center text-center overflow-hidden transition-transform hover:scale-105`}
+        style={{
+          background: `linear-gradient(135deg, ${palette.from} 0%, ${palette.to} 100%)`,
+          color: palette.text,
+        }}
       >
-          {/* Pattern Overlay */}
-          <div 
-            className="absolute inset-0 opacity-30 group-hover:opacity-40 transition-opacity duration-500"
-            style={{
-              backgroundImage: pattern,
-              backgroundSize: size === 'large' ? '20px 20px' : '10px 10px',
-            }}
-          />
-          
-          {/* Spine effect */}
-          <div className="absolute left-0 top-0 bottom-0 w-[4%] bg-black/10" />
-          
-          {/* Subtle sheen animation */}
-          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/20 to-transparent translate-x-[-100%] animate-[shimmer_3s_infinite]" />
+        <div 
+          className="absolute inset-0 opacity-30"
+          style={{
+            backgroundImage: pattern,
+            backgroundSize: size === 'large' ? '20px 20px' : '10px 10px',
+          }}
+        />
+        
+        <div className="absolute left-0 top-0 bottom-0 w-[4%] bg-black/10" />
 
-          <div className="relative z-10 drop-shadow-md">
-            <h3 className={`font-bold ${titleClass} break-keep`}>{safeTitle}</h3>
-            <div className={`w-1/2 h-px bg-current opacity-50 mx-auto my-1 ${size === 'small' ? 'hidden' : 'block'}`} />
-            <p className={`opacity-90 ${authorClass}`}>{safeAuthor}</p>
-          </div>
-          
-          <style>{`
-            @keyframes shimmer {
-              100% { transform: translateX(100%); }
-            }
-          `}</style>
+        <div className="relative z-10 drop-shadow-md">
+          <h3 className={`font-bold ${titleClass} break-keep`}>{safeTitle}</h3>
+          <div className={`w-1/2 h-px bg-current opacity-50 mx-auto my-1 ${size === 'small' ? 'hidden' : 'block'}`} />
+          <p className={`opacity-90 ${authorClass}`}>{safeAuthor}</p>
+        </div>
       </div>
     );
   }
 
+  // 실제 이미지 표시
   return (
     <div className={`relative ${containerClasses} ${className} bg-gray-200 dark:bg-gray-800/50 overflow-hidden transition-transform hover:scale-105`}>
       {isLoading && (
         <div className="absolute inset-0 animate-pulse bg-gray-300 dark:bg-gray-700 flex items-center justify-center">
-            <div className="w-8 h-8 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
         </div>
       )}
       {displayUrl && (
-         <img
+        <img
           src={displayUrl}
-          alt={`${title} book cover`}
+          alt={`${title} 표지`}
           className={`w-full h-full object-cover transition-opacity duration-500 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
-          onError={() => setShowFallback(true)}
+          crossOrigin="anonymous"
+          onError={() => {
+            console.log('❌ img 태그 렌더링 실패:', displayUrl);
+            setShowFallback(true);
+          }}
+          onLoad={() => {
+            console.log('✅ img 태그 렌더링 성공:', displayUrl);
+          }}
         />
       )}
     </div>
